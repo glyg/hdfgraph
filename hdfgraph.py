@@ -1,7 +1,7 @@
 #!/usr/bin/env python -*- coding: utf-8 -*-
 
 '''This module allows to import and export
-(http://graph-tool.skewed.de)[graph-tool] Graph objects to HDF5 files using pandas
+[http://graph-tool.skewed.de](graph-tool) Graph objects to HDF5 files using pandas
 '''
 
 from __future__ import unicode_literals
@@ -167,9 +167,7 @@ def graph_from_dataframes(vertex_df, edge_df):
         prop = graph.new_edge_property(dtype)
         prop.a = edge_df[col]
         graph.edge_properties[col] = prop
-
     return graph
-
 
 def frames_from_hdf(fname, stamp=None):
     
@@ -184,5 +182,6 @@ def frames_from_hdf(fname, stamp=None):
 
 def graph_from_hdf(fname, stamp=None):
 
-    vertex_df, edge_df = frames_from_hdf(fname, stamp=None)
+    vertex_df, edge_df = frames_from_hdf(fname, stamp=stamp)
     return graph_from_dataframes(vertex_df, edge_df)
+
