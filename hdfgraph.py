@@ -72,29 +72,36 @@ def graph_to_dataframes(graph, stamp=None):
     if stamp is not None:
         vertex_index = pd.MultiIndex.from_tuples([(stamp, graph.vertex_index[v])
                                                   for v in graph.vertices()],
-                                                 names=('stamp', 'vertex_index'))
-        edge_index = pd.MultiIndex.from_tuples([(stamp, graph.vertex_index[source],
+                                                 names=('stamp',
+                                                        'vertex_index'))
+        edge_index = pd.MultiIndex.from_tuples([(stamp,
+                                                 graph.vertex_index[source],
                                                  graph.vertex_index[target])
-                                                for source, target in graph.edges()],
-                                                names=('stamp', 'source', 'target'))
+                                                for source, target
+                                                in graph.edges()],
+                                               names=('stamp',
+                                                      'source',
+                                                      'target'))
     else:
         vertex_index = pd.Index([graph.vertex_index[v]
                                  for v in graph.vertices()],
                                 name='vertex_index')
         edge_index = pd.MultiIndex.from_tuples([(graph.vertex_index[source],
                                                  graph.vertex_index[target])
-                                                for source, target in graph.edges()],
+                                                for source, target
+                                                in graph.edges()],
                                                 names=('source', 'target'))
-        
     vertex_df = pd.DataFrame({key: np.array(prop.a, dtype=prop.a.dtype)
                               for key, prop in graph.vertex_properties.items()
                               if prop.value_type() in TYPES_WHITELIST},
                              index=vertex_index)
-
-    edge_df = pd.DataFrame({key: np.array(prop.a, dtype=prop.a.dtype)
+    valid = _get_valid_mask(graph)
+    graph.set_edge_filter(valid)
+    edge_df = pd.DataFrame({key: np.array(prop.fa, dtype=prop.fa.dtype)
                             for key, prop in graph.edge_properties.items() 
                             if prop.value_type() in TYPES_WHITELIST},
                            index=edge_index)
+    graph.set_edge_filter(None)
     return vertex_df, edge_df
 
 def frames_to_hdf(vertex_df, edge_df, fname, reset=False, **kwargs):
@@ -107,6 +114,7 @@ def frames_to_hdf(vertex_df, edge_df, fname, reset=False, **kwargs):
                       format='table', **kwargs)
             store.put('vertices', vertex_df,
                       format='table', **kwargs) 
+        ## FIXME: should only remove the matching index
         elif reset:
             try:
                 store.remove('vertices')
@@ -131,10 +139,11 @@ def graph_to_hdf(graph, fname, stamp=None, reset=False, **kwargs):
     
     '''
     vertex_df, edge_df = graph_to_dataframes(graph, stamp=stamp)
-    frames_to_hdf(vertex_df, edge_df, fname, **kwargs)
+    frames_to_hdf(vertex_df, edge_df, fname, reset=reset, **kwargs)
 
 def graph_from_dataframes(vertex_df, edge_df):
-    '''Re-creates a Graph object with PropertyMaps taken from the vertex_df and edge_df DataFrames
+    '''Re-creates a Graph object with PropertyMaps taken
+    from the vertex_df and edge_df DataFrames
 
     Paramters:
     ==========
@@ -143,7 +152,8 @@ def graph_from_dataframes(vertex_df, edge_df):
 
     Returns:
     ========
-    graph: a grah-tool Graph with PropertyMaps copied from the columns of the input DataFrames
+    graph: a grah-tool Graph with PropertyMaps copied
+        from the columns of the input DataFrames
     '''
 
     graph = gt.Graph(directed=True)
@@ -169,15 +179,21 @@ def graph_from_dataframes(vertex_df, edge_df):
         graph.edge_properties[col] = prop
     return graph
 
-def frames_from_hdf(fname, stamp=None):
+def frames_from_hdf(fname, stamp=None, vertex_kwargs={}, edge_kwargs={}):
     
     with pd.get_store(fname) as store:
         if stamp is not None:
-            vertex_df = store.select('vertices', where="'stamp'=stamp")
-            edge_df = store.select('edges', where="'stamp'=stamp")
+            vertex_df = store.select('vertices',
+                                     where="'stamp'=stamp",
+                                     **vertex_kwargs)
+            edge_df = store.select('edges',
+                                   where="'stamp'=stamp",
+                                   **edge_kwargs)
         else:
-            vertex_df = store['vertices']
-            edge_df = store['edges']
+            vertex_df = store.select('vertices',
+                                     **vertex_kwargs)
+            edge_df = store.select('edges',
+                                   **edge_kwargs)
     return vertex_df, edge_df
 
 def graph_from_hdf(fname, stamp=None):
@@ -185,3 +201,10 @@ def graph_from_hdf(fname, stamp=None):
     vertex_df, edge_df = frames_from_hdf(fname, stamp=stamp)
     return graph_from_dataframes(vertex_df, edge_df)
 
+def _get_valid_mask(graph):
+    '''Mask over valid edges '''
+    valid = graph.new_edge_property('bool')
+    valid.a[:] = 0
+    for edge in graph.edges():
+        valid[edge] = 1
+    return valid
