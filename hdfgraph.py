@@ -91,7 +91,7 @@ def graph_to_dataframes(graph, stamp=None):
                                                 for source, target
                                                 in graph.edges()],
                                                 names=('source', 'target'))
-    vertex_df = pd.DataFrame({key: np.array(prop.a, dtype=prop.a.dtype)
+    vertex_df = pd.DataFrame({key: np.array(prop.fa, dtype=prop.fa.dtype)
                               for key, prop in graph.vertex_properties.items()
                               if prop.value_type() in TYPES_WHITELIST},
                              index=vertex_index)
