@@ -302,15 +302,17 @@ def slice_data(vertices_df, edges_df, v_bounds={}):
     srcs = src_index.intersection(vertex_index)
     trgts = trgt_index.intersection(vertex_index)
     edges_df['keep'] = True
-    edges_df = edges_df.groupby(level='source').apply(select_idx_, 'source', srcs)
-    edges_df = edges_df[edges_df['keep']]
-    edges_df = edges_df.groupby(level='target').apply(select_idx_, 'target', trgts)
-    edges_df = edges_df[edges_df['keep']]
+    keep = edges_df.groupby(level='source', group_keys=True).apply(select_idx_, 'source', srcs,)
+    assert keep.shape[0] == edges_df.shape[0]
+    edges_df = edges_df[keep.values]
+    keep = edges_df.groupby(level='target', group_keys=True).apply(select_idx_, 'target', trgts)
+    edges_df = edges_df[keep.values]
     return vertices_df, edges_df
 
 
 def select_idx_(df, idx_name, valids):
     idx = df.index.get_level_values(idx_name)[0]
+    keep = df.keep.copy()
     if idx not in valids:
-        df['keep'] = False
-    return df
+        keep.loc[:] = False
+    return keep
